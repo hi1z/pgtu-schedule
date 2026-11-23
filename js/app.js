@@ -206,8 +206,10 @@
       state.weekAuto = false;
     }
 
-    if (view === 'schedule' || view === 'bells' || view === 'roulette') {
+    if (view === 'schedule' || view === 'roulette') {
       state.view = view;
+    } else if (view === 'bells') {
+      state.view = 'schedule';
     }
 
     if (day && ['all', 'mon', 'tue', 'wed', 'thu', 'fri'].indexOf(day) !== -1) {
@@ -490,7 +492,9 @@
   }
 
   function renderBells() {
+    if (!els.bellsTable) return;
     var tbody = els.bellsTable.querySelector('tbody');
+    if (!tbody) return;
     var currentBell = getCurrentBellStatus();
 
     tbody.innerHTML = DATA.bells.map(function (row) {
@@ -536,6 +540,7 @@
   }
 
   function renderClockTicks() {
+    if (!els.clockTicks) return;
     var markup = '';
     for (var i = 0; i < 60; i++) {
       var major = i % 5 === 0;
