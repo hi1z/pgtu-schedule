@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Расписание занятий и звонков УНИИТ — ПГТУ филиал НИУ МГСУ. Современная темная монохромная тема.">
+  <meta name="theme-color" content="#09090b">
+  <title>Расписание занятий — ПГТУ</title>
+  
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Расписание">
+</head>
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <div class="header-brand">
+        <div class="brand-line">
+          <span class="badge-mono" id="org">ПГТУ / УНИИТ</span>
+          <span class="brand-divider">/</span>
+          <span class="live-clock-badge" id="header-mini-clock" title="Время по GMT+3">--:--</span>
+        </div>
+        <h1 class="site-header__title" id="title">Расписание занятий</h1>
+        <p class="site-header__subtitle" id="period">Высшее образование</p>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn btn--outline btn--sm install-btn" type="button" id="install-btn" hidden>
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Установить PWA</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container main-content">
+    <!-- Toolbar with Tabs & Controls -->
+    <div class="toolbar">
+      <nav class="nav-tabs" aria-label="Разделы">
+        <button class="tab is-active" type="button" data-view="schedule">
+          <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" stroke-linecap="round"/>
+            <line x1="16" y1="2" x2="16" y2="6" stroke-linecap="round"/>
+            <line x1="8" y1="2" x2="8" y2="6" stroke-linecap="round"/>
+            <line x1="3" y1="10" x2="21" y2="10" stroke-linecap="round"/>
+          </svg>
+          <span>Занятия</span>
+        </button>
+
+        <button class="tab" type="button" data-view="bells">
+          <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" stroke-linecap="round"/>
+            <polyline points="12 6 12 12 16 14" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Звонки</span>
+        </button>
+
+        <button class="tab" type="button" data-view="roulette">
+          <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" stroke-linecap="round"/>
+            <line x1="12" y1="2" x2="12" y2="12"/>
+            <line x1="12" y1="12" x2="20.6" y2="17"/>
+            <line x1="12" y1="12" x2="3.4" y2="17"/>
+            <circle cx="12" cy="12" r="2" fill="currentColor"/>
+          </svg>
+          <span>Рулетка</span>
+        </button>
+      </nav>
+
+      <!-- Context Controls for Schedule -->
+      <div class="context-controls" id="schedule-controls">
+        <div class="group-selector-box">
+          <div class="group-info" id="group-chip">
+            <span class="group-chip__name">—</span>
+            <span class="group-chip__meta">—</span>
+          </div>
+          <button class="btn btn--outline btn--xs" type="button" id="change-group" title="Выбрать другую группу">
+            Сменить
+          </button>
+        </div>
+
+        <div class="week-switch-wrapper">
+          <div class="segmented" id="week-switch" role="group" aria-label="Выбор недели">
+            <button class="segmented__btn" type="button" data-week="even">Чётная</button>
+            <button class="segmented__btn" type="button" data-week="odd">Нечётная</button>
+          </div>
+          <button class="auto-toggle is-active" type="button" id="auto-week" aria-pressed="true" title="Определять неделю по текущей дате">
+            <span class="auto-indicator"></span>
+            <span>Авто</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 1: Расписание занятий -->
+    <section class="view is-active" id="view-schedule" aria-labelledby="schedule-heading">
+      <h2 class="visually-hidden" id="schedule-heading">Расписание занятий</h2>
+
+      <!-- Empty State if no group is picked -->
+      <div class="schedule-empty" id="schedule-empty" hidden>
+        <div class="empty-box">
+          <div class="empty-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <h3 class="empty-title">Группа не выбрана</h3>
+          <p class="empty-text">Выберите ваш факультет, курс и академическую группу для отображения персонального расписания.</p>
+          <button class="btn btn--solid" type="button" id="empty-choose">Выбрать группу</button>
+        </div>
+      </div>
+
+      <!-- Mobile Day Filter Tabs -->
+      <div class="mobile-day-filter" id="mobile-day-filter" aria-label="Фильтр по дням недели">
+        <button class="day-chip is-active" type="button" data-day="all">Все дни</button>
+        <button class="day-chip" type="button" data-day="mon">Пн</button>
+        <button class="day-chip" type="button" data-day="tue">Вт</button>
+        <button class="day-chip" type="button" data-day="wed">Ср</button>
+        <button class="day-chip" type="button" data-day="thu">Чт</button>
+        <button class="day-chip" type="button" data-day="fri">Пт</button>
+      </div>
+
+      <!-- Main Schedule Grid / Table -->
+      <div class="table-wrap" id="schedule-wrap">
+        <table class="schedule" id="schedule-table"></table>
+      </div>
+
+      <!-- Mobile Single Day Card Stack (visible when a single day is filtered on mobile) -->
+      <div class="mobile-day-stack" id="mobile-day-stack" hidden></div>
+
+      <!-- Optional Ad Slot (disabled by default) -->
+      <section class="ad-slot" id="ad-slot" aria-label="Реклама" hidden>
+        <span class="ad-slot__label">Реклама</span>
+        <div class="ad-slot__body" id="ad-slot-body"></div>
+      </section>
+    </section>
+
+    <!-- VIEW 2: Звонки -->
+    <section class="view" id="view-bells" aria-labelledby="bells-heading" hidden>
+      <div class="section-header">
+        <h2 class="section-title" id="bells-heading">Расписание звонков</h2>
+        <span class="section-badge">80 мин пара · 10 мин перерыв</span>
+      </div>
+
+      <div class="bells-grid">
+        <div class="bells-table-card">
+          <table class="bells" id="bells-table">
+            <thead>
+              <tr>
+                <th scope="col">Пара</th>
+                <th scope="col">Время</th>
+                <th scope="col">Статус</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <aside class="clock-card" aria-label="Текущее время по GMT+3">
+          <div class="clock-card__header">
+            <span class="clock-card__label">Точное время</span>
+            <span class="clock-card__zone">GMT+3 (МСК)</span>
+          </div>
+
+          <div class="clock-analog-wrap">
+            <svg class="clock-analog" viewBox="0 0 240 240" aria-hidden="true">
+              <circle cx="120" cy="120" r="114" class="clock-dial" />
+              <circle cx="120" cy="120" r="106" class="clock-dial-inner" />
+
+              <g id="clock-ticks"></g>
+
+              <g class="clock-numerals" text-anchor="middle">
+                <text x="120" y="46">12</text>
+                <text x="194" y="125">3</text>
+                <text x="120" y="202">6</text>
+                <text x="46" y="125">9</text>
+              </g>
+
+              <g stroke-linecap="round">
+                <line id="clock-hour" class="hand hand--hour" x1="120" y1="128" x2="120" y2="70" />
+                <line id="clock-minute" class="hand hand--minute" x1="120" y1="132" x2="120" y2="48" />
+                <line id="clock-second" class="hand hand--second" x1="120" y1="136" x2="120" y2="38" />
+              </g>
+
+              <circle cx="120" cy="120" r="4.5" class="clock-center-dot" />
+            </svg>
+          </div>
+
+          <div class="clock-digital">
+            <span class="clock-time-val" id="clock-time">00:00:00</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- VIEW 3: Рулетка -->
+    <section class="view" id="view-roulette" aria-labelledby="roulette-heading" hidden>
+      <div class="section-header">
+        <h2 class="section-title" id="roulette-heading">Рулетка выбора</h2>
+        <span class="section-badge">Генератор случайных решений</span>
+      </div>
+
+      <div class="roulette-layout">
+        <div class="roulette__stage">
+          <svg class="roulette__wheel" viewBox="0 0 320 320" role="img"
+            aria-label="Колесо: остаться дома — 5%, не идти на пару — 45%, идти на пару — 50%">
+            <circle class="roulette__rim-outer" cx="160" cy="160" r="156" />
+            <g id="wheel-segments"></g>
+            <circle class="roulette__rim" cx="160" cy="160" r="150" />
+            <circle class="roulette__hub" cx="160" cy="160" r="32" />
+            <g class="roulette__needle" id="wheel-needle">
+              <path d="M160 14 l9 32 -4 4 v110 h-10 V50 l-4 -4 z" />
+            </g>
+            <circle class="roulette__needle-cap" cx="160" cy="160" r="8" />
+          </svg>
+        </div>
+
+        <div class="roulette__panel">
+          <p class="roulette__lead">
+            Сложно решить, идти ли на пару? Доверьтесь вероятности:
+          </p>
+
+          <button class="btn btn--solid btn--lg roulette__spin" type="button" id="spin-wheel">
+            Крутить колесо
+          </button>
+
+          <div class="roulette__result" id="wheel-result" role="status" aria-live="polite">
+            <span class="roulette__result-placeholder">Нажмите кнопку, чтобы запустить вращение</span>
+          </div>
+
+          <ul class="roulette__legend">
+            <li class="legend-item">
+              <span class="legend-swatch swatch--home"></span>
+              <span class="legend-text">Остаться дома</span>
+              <span class="legend-pct">5%</span>
+            </li>
+            <li class="legend-item">
+              <span class="legend-swatch swatch--skip"></span>
+              <span class="legend-text">Не идти на пару</span>
+              <span class="legend-pct">45%</span>
+            </li>
+            <li class="legend-item">
+              <span class="legend-swatch swatch--go"></span>
+              <span class="legend-text">Идти на пару</span>
+              <span class="legend-pct">50%</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <div class="footer-left">
+        <span class="footer-brand">ПГТУ — филиал НИУ МГСУ</span>
+        <span class="footer-sep">·</span>
+        <span class="footer-note">УНИИТ · Расписание занятий</span>
+      </div>
+      <div class="footer-right">
+        <a href="privacy.html" class="footer-link">Конфиденциальность</a>
+        <span class="footer-sep">·</span>
+        <span class="footer-dim">Неофициальный сервис</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modal: Выбор группы -->
+  <div class="modal" id="setup-modal" hidden>
+    <div class="modal__backdrop" data-setup-close></div>
+    <div class="modal__card modal__card--wide" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+      <div class="modal__header">
+        <div>
+          <h2 class="modal__title" id="setup-title">Выбор группы</h2>
+          <p class="modal__subtitle">Расписание сохранится на этом устройстве</p>
+        </div>
+        <button class="modal__close" type="button" aria-label="Закрыть окно" data-setup-close>×</button>
+      </div>
+
+      <div class="modal__body">
+        <div class="setup__field">
+          <label class="setup__label">Факультет</label>
+          <div class="setup__options" id="setup-faculties" role="group"></div>
+        </div>
+
+        <div class="setup__field">
+          <label class="setup__label">Курс</label>
+          <div class="setup__options" id="setup-courses" role="group"></div>
+        </div>
+
+        <div class="setup__field">
+          <label class="setup__label">Академическая группа</label>
+          <div class="setup__options setup__options--grid" id="setup-groups" role="group"></div>
+        </div>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--solid btn--block" type="button" id="setup-apply" disabled>
+          Показать расписание
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: PWA Установка -->
+  <div class="modal" id="install-modal" hidden>
+    <div class="modal__backdrop" data-install-close></div>
+    <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="install-title">
+      <div class="modal__header">
+        <div>
+          <h2 class="modal__title" id="install-title">Установка на экран</h2>
+          <p class="modal__subtitle">Быстрый запуск без браузерной строки и работа офлайн</p>
+        </div>
+        <button class="modal__close" type="button" aria-label="Закрыть окно" data-install-close>×</button>
+      </div>
+
+      <div class="modal__body">
+        <ol class="install-steps" id="install-steps"></ol>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--solid" type="button" id="install-native" hidden>Установить</button>
+        <button class="btn btn--outline" type="button" data-install-close>Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/ads.js"></script>
+</body>
+</html>
