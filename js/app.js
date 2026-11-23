@@ -981,13 +981,27 @@
   }
 
   function sendNativeNotification(title, body) {
+    var options = {
+      body: body,
+      icon: 'icons/icon-192.png',
+      badge: 'icons/favicon-32.png',
+      vibrate: [200, 100, 200, 100, 300],
+      tag: 'pgtu-pair-alert',
+      renotify: true,
+      data: { url: window.location.href },
+    };
+
     try {
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, {
-          body: body,
-          icon: 'icons/icon-192.png',
-          badge: 'icons/favicon-32.png',
-        });
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(function (reg) {
+            reg.showNotification(title, options);
+          }).catch(function () {
+            try { new Notification(title, options); } catch (err) {}
+          });
+        } else {
+          new Notification(title, options);
+        }
       }
     } catch (e) {}
   }

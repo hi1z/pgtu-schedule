@@ -1,5 +1,5 @@
 /* Service Worker: офлайн-доступ и кэширование */
-var CACHE = 'pgtu-schedule-mono-v2';
+var CACHE = 'pgtu-schedule-mono-v3';
 
 var ASSETS = [
   './',
@@ -75,6 +75,26 @@ self.addEventListener('fetch', function (event) {
         }
         return Promise.reject(new Error('Offline and not in cache'));
       });
+    })
+  );
+});
+
+// Клик по нативному уведомлению — открывает приложение
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+  var targetUrl = (event.notification.data && event.notification.data.url) || './';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if ('focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
     })
   );
 });
