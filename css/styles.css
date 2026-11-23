@@ -270,6 +270,111 @@ h1, h2, h3, h4, p, ul, ol {
   gap: 10px;
 }
 
+/* ── Reminder Banner (Status Bar) ────────────────────────────── */
+
+.reminder-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.4;
+  transition: all 0.2s ease;
+}
+
+.reminder-bar--calm {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.reminder-bar--upcoming {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+}
+
+.reminder-bar--active {
+  background: #141418;
+  border: 1px solid var(--border-strong);
+  color: #ffffff;
+}
+
+.reminder-bar--urgent {
+  background: #18181d;
+  border: 1px solid #ffffff;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  animation: urgentGlow 2s infinite ease-in-out;
+}
+
+@keyframes urgentGlow {
+  0%, 100% { border-color: rgba(255, 255, 255, 0.6); box-shadow: 0 0 10px rgba(255, 255, 255, 0.08); }
+  50% { border-color: #ffffff; box-shadow: 0 0 24px rgba(255, 255, 255, 0.22); }
+}
+
+.reminder-bar__content {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.reminder-bar__alert-title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.reminder-bar__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.reminder-bar__room {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+}
+
+.reminder-bar__note {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.reminder-bar__action {
+  flex-shrink: 0;
+}
+
+.urgent-pulse-icon {
+  font-size: 16px;
+  animation: pulse 1s infinite;
+}
+
+.reminder-btn.is-active {
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.test-reminder-btn {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 /* ── Main Layout & Toolbar ────────────────────────────────────── */
 
 .main-content {
@@ -1339,6 +1444,120 @@ h1, h2, h3, h4, p, ul, ol {
 
 .modal__card--wide {
   max-width: 580px;
+}
+
+.modal__card--urgent {
+  max-width: 520px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.95), 0 0 35px rgba(255, 255, 255, 0.15);
+}
+
+.urgent-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.urgent-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 8px;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 3px;
+  letter-spacing: 0.06em;
+}
+
+.urgent-card-body {
+  padding: 24px;
+}
+
+.urgent-phrase {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+  margin-bottom: 20px;
+}
+
+.urgent-lesson-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: #09090b;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.urgent-lesson-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.urgent-time {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.urgent-room {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-default);
+  border-radius: 3px;
+}
+
+.urgent-subject {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.3;
+}
+
+.urgent-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.urgent-type {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  background: #27272a;
+  border-radius: 3px;
+}
+
+.urgent-countdown {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.urgent-countdown b {
+  color: #ffffff;
+}
+
+.urgent-footer {
+  padding: 16px 24px 22px;
+  gap: 12px;
 }
 
 @keyframes modalEnter {

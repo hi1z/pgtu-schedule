@@ -56,6 +56,14 @@
     installModal: document.getElementById('install-modal'),
     installSteps: document.getElementById('install-steps'),
     installNative: document.getElementById('install-native'),
+    reminderBar: document.getElementById('reminder-bar'),
+    reminderToggleBtn: document.getElementById('reminder-toggle-btn'),
+    reminderBtnText: document.getElementById('reminder-btn-text'),
+    reminderTestBtn: document.getElementById('reminder-test-btn'),
+    reminderModal: document.getElementById('reminder-modal'),
+    reminderPhrase: document.getElementById('reminder-phrase'),
+    reminderLessonDetails: document.getElementById('reminder-lesson-details'),
+    reminderSnooze: document.getElementById('reminder-snooze'),
   };
 
   // ── Утилиты ──────────────────────────────────────────────────────
@@ -517,6 +525,8 @@
     syncControls();
     renderSchedule();
     renderBells();
+    syncReminderButton();
+    updateReminderStatus();
   }
 
   // ── Часы (Swiss Minimalist) ──────────────────────────────────────
@@ -897,6 +907,333 @@
     document.body.classList.remove('has-modal');
   }
 
+  // ── Напоминания о парах (за 5 минут) ──────────────────────────────
+
+  var REMINDER_STORAGE_KEY = 'pgtu.reminders.enabled';
+  var remindersEnabled = true;
+  try {
+    var storedRem = window.localStorage.getItem(REMINDER_STORAGE_KEY);
+    if (storedRem !== null) remindersEnabled = (storedRem === 'true');
+  } catch (e) {}
+
+  var lastTriggeredPairKey = null;
+
+  var REMINDER_PHRASES = [
+    'У тебя пара, ебень!',
+    'Пора бежать!',
+    'Запихуй бутик и на пару!',
+    'Хватит втыкать, пара через 5 минут!',
+    'Ноги в руки и в универ!',
+    'Препод уже на подходе, шевели булками!',
+    'Доедай шавуху и лети в аудиторию!',
+    'Пять минут до звонка, пора двигать!',
+    'Включай форсаж, пара сама себя не отсидит!',
+    'Оставь рилсы, звонок уже близко!',
+    'Шевелись, а то займут козырные места на задней парте!',
+    'Хватай рюкзак и стартуй, опоздаешь ведь!',
+    'Подъём, боец! До пары ровно 5 минут!'
+  ];
+
+  function getRandomPhrase() {
+    return REMINDER_PHRASES[Math.floor(Math.random() * REMINDER_PHRASES.length)];
+  }
+
+  function playAlertChime() {
+    try {
+      var AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      var ctx = new AudioContext();
+      var now = ctx.currentTime;
+
+      var osc1 = ctx.createOscillator();
+      var osc2 = ctx.createOscillator();
+      var gain = ctx.createGain();
+
+      osc1.type = 'triangle';
+      osc2.type = 'sine';
+
+      osc1.frequency.setValueAtTime(587.33, now); // D5
+      osc1.frequency.setValueAtTime(880, now + 0.12); // A5
+
+      osc2.frequency.setValueAtTime(587.33 * 2, now);
+      osc2.frequency.setValueAtTime(880 * 2, now + 0.12);
+
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.55);
+      osc2.stop(now + 0.55);
+    } catch (e) {}
+  }
+
+  function triggerVibrate() {
+    try {
+      if ('vibrate' in navigator) {
+        navigator.vibrate([200, 100, 200, 100, 300]);
+      }
+    } catch (e) {}
+  }
+
+  function sendNativeNotification(title, body) {
+    try {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, {
+          body: body,
+          icon: 'icons/icon-192.png',
+          badge: 'icons/favicon-32.png',
+        });
+      }
+    } catch (e) {}
+  }
+
+  function syncReminderButton() {
+    if (!els.reminderToggleBtn) return;
+    els.reminderToggleBtn.classList.toggle('is-active', remindersEnabled);
+    if (els.reminderBtnText) {
+      els.reminderBtnText.textContent = remindersEnabled ? '🔔 Вкл' : '🔕 Выкл';
+    }
+  }
+
+  function toggleReminders() {
+    remindersEnabled = !remindersEnabled;
+    try {
+      window.localStorage.setItem(REMINDER_STORAGE_KEY, String(remindersEnabled));
+    } catch (e) {}
+    syncReminderButton();
+
+    if (remindersEnabled && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(function () {
+        updateReminderStatus();
+      });
+    }
+    updateReminderStatus();
+  }
+
+  function getUpcomingLessonInfo() {
+    if (!state.group) return null;
+    var day = todayId();
+    if (!day) return { status: 'weekend' };
+
+    var curMins = getCurrentGmt3Minutes();
+    var allLessons = [];
+
+    DATA.pairs.forEach(function (pair) {
+      var lessons = lessonsFor(day, pair.number);
+      var bell = getBellForPair(pair.number);
+      if (lessons.length > 0 && bell) {
+        allLessons.push({
+          pair: pair,
+          lesson: lessons[0],
+          bell: bell,
+          startMins: parseTimeToMinutes(bell.start),
+          endMins: parseTimeToMinutes(bell.end),
+        });
+      }
+    });
+
+    if (allLessons.length === 0) {
+      return { status: 'no-lessons-today' };
+    }
+
+    for (var i = 0; i < allLessons.length; i++) {
+      var item = allLessons[i];
+      if (curMins >= item.startMins && curMins <= item.endMins) {
+        return {
+          status: 'in-progress',
+          item: item,
+          minutesLeft: item.endMins - curMins,
+        };
+      }
+    }
+
+    for (var j = 0; j < allLessons.length; j++) {
+      var next = allLessons[j];
+      if (curMins < next.startMins) {
+        return {
+          status: 'upcoming',
+          item: next,
+          minutesUntil: next.startMins - curMins,
+        };
+      }
+    }
+
+    return { status: 'finished' };
+  }
+
+  function showUrgentModal(phrase, lesson, bell, minutes) {
+    if (!els.reminderModal) return;
+    if (els.reminderPhrase) els.reminderPhrase.textContent = phrase;
+    if (els.reminderLessonDetails) {
+      var roomStr = lesson.room ? 'ауд. ' + escapeHtml(lesson.room) : 'аудитория не указана';
+      var teacherStr = lesson.teacher ? escapeHtml(lesson.teacher) : '';
+      var typeStr = lesson.typeLabel || 'Пара';
+
+      els.reminderLessonDetails.innerHTML =
+        '<div class="urgent-lesson-top">' +
+          '<span class="urgent-time">' + escapeHtml(bell.start) + ' — ' + escapeHtml(bell.end) + '</span>' +
+          '<span class="urgent-room">' + roomStr + '</span>' +
+        '</div>' +
+        '<div class="urgent-subject">' + escapeHtml(lesson.subject) + '</div>' +
+        '<div class="urgent-meta">' +
+          '<span class="urgent-type">' + escapeHtml(typeStr) + '</span>' +
+          (teacherStr ? '<span class="urgent-teacher">' + teacherStr + '</span>' : '') +
+        '</div>' +
+        '<div class="urgent-countdown">До звонка осталось: <b>' + (minutes != null ? minutes : 5) + ' мин</b></div>';
+    }
+
+    els.reminderModal.hidden = false;
+    document.body.classList.add('has-modal');
+  }
+
+  function closeReminderModal() {
+    if (!els.reminderModal || els.reminderModal.hidden) return;
+    els.reminderModal.hidden = true;
+    document.body.classList.remove('has-modal');
+  }
+
+  function updateReminderStatus() {
+    if (!els.reminderBar) return;
+    if (!state.group) {
+      els.reminderBar.hidden = true;
+      return;
+    }
+
+    var info = getUpcomingLessonInfo();
+    if (!info) {
+      els.reminderBar.hidden = true;
+      return;
+    }
+
+    els.reminderBar.hidden = false;
+
+    if (info.status === 'weekend') {
+      els.reminderBar.className = 'reminder-bar reminder-bar--calm';
+      els.reminderBar.innerHTML =
+        '<span class="reminder-bar__icon">☕</span>' +
+        '<span class="reminder-bar__text">Сегодня выходной! Занятий нет, отдыхаем.</span>';
+      return;
+    }
+
+    if (info.status === 'no-lessons-today') {
+      els.reminderBar.className = 'reminder-bar reminder-bar--calm';
+      els.reminderBar.innerHTML =
+        '<span class="reminder-bar__icon">🎉</span>' +
+        '<span class="reminder-bar__text">На сегодня занятий в расписании нет.</span>';
+      return;
+    }
+
+    if (info.status === 'finished') {
+      els.reminderBar.className = 'reminder-bar reminder-bar--calm';
+      els.reminderBar.innerHTML =
+        '<span class="reminder-bar__icon">✨</span>' +
+        '<span class="reminder-bar__text">Все пары на сегодня закончились! Свобода.</span>';
+      return;
+    }
+
+    if (info.status === 'in-progress') {
+      var curLesson = info.item.lesson;
+      var curBell = info.item.bell;
+      els.reminderBar.className = 'reminder-bar reminder-bar--active';
+      els.reminderBar.innerHTML =
+        '<span class="pulse-dot"></span>' +
+        '<div class="reminder-bar__content">' +
+          '<span class="reminder-bar__label">СЕЙЧАС ИДЁТ:</span> ' +
+          '<b>' + escapeHtml(curLesson.subject) + '</b> ' +
+          (curLesson.room ? '<span class="reminder-bar__room">ауд. ' + escapeHtml(curLesson.room) + '</span>' : '') +
+          '<span class="reminder-bar__note">до конца ' + info.minutesLeft + ' мин (' + escapeHtml(curBell.end) + ')</span>' +
+        '</div>';
+      return;
+    }
+
+    if (info.status === 'upcoming') {
+      var upLesson = info.item.lesson;
+      var upBell = info.item.bell;
+      var mins = info.minutesUntil;
+
+      if (mins <= 5 && mins >= 0) {
+        var pairKey = todayId() + '-' + info.item.pair.number + '-' + effectiveWeek();
+        var phrase = getRandomPhrase();
+
+        if (remindersEnabled && lastTriggeredPairKey !== pairKey) {
+          lastTriggeredPairKey = pairKey;
+          playAlertChime();
+          triggerVibrate();
+          showUrgentModal(phrase, upLesson, upBell, mins);
+          sendNativeNotification(phrase, 'Через ' + mins + ' мин: ' + upLesson.subject + (upLesson.room ? ' (ауд. ' + upLesson.room + ')' : ''));
+        }
+
+        els.reminderBar.className = 'reminder-bar reminder-bar--urgent';
+        els.reminderBar.innerHTML =
+          '<span class="urgent-pulse-icon">🚨</span>' +
+          '<div class="reminder-bar__content">' +
+            '<span class="reminder-bar__alert-title">' + escapeHtml(phrase) + '</span> ' +
+            '<span class="reminder-bar__text">Через <b>' + mins + ' мин</b>: ' + escapeHtml(upLesson.subject) + '</span> ' +
+            (upLesson.room ? '<span class="reminder-bar__room">ауд. ' + escapeHtml(upLesson.room) + '</span>' : '') +
+          '</div>' +
+          '<button class="btn btn--solid btn--xs reminder-bar__action" type="button" id="reminder-bar-open">Открыть</button>';
+
+        var openBtn = document.getElementById('reminder-bar-open');
+        if (openBtn) {
+          openBtn.addEventListener('click', function () {
+            showUrgentModal(phrase, upLesson, upBell, mins);
+          });
+        }
+      } else {
+        els.reminderBar.className = 'reminder-bar reminder-bar--upcoming';
+        els.reminderBar.innerHTML =
+          '<span class="reminder-bar__icon">⏳</span>' +
+          '<div class="reminder-bar__content">' +
+            '<span class="reminder-bar__label">Следующая пара:</span> ' +
+            '<b>' + escapeHtml(upLesson.subject) + '</b> ' +
+            (upLesson.room ? '<span class="reminder-bar__room">ауд. ' + escapeHtml(upLesson.room) + '</span>' : '') +
+            '<span class="reminder-bar__note">через ' + mins + ' мин (в ' + escapeHtml(upBell.start) + ')</span>' +
+          '</div>';
+      }
+    }
+  }
+
+  function triggerTestReminder() {
+    var phrase = getRandomPhrase();
+    var info = getUpcomingLessonInfo();
+    var lesson, bell;
+
+    if (info && (info.item || info.status === 'in-progress')) {
+      lesson = info.item.lesson;
+      bell = info.item.bell;
+    } else {
+      lesson = {
+        subject: 'Прикладной искусственный интеллект',
+        type: 'lecture',
+        typeLabel: 'Лекция',
+        room: '5.410',
+        teacher: 'Тютюников В. А.',
+      };
+      bell = { start: '10:00', end: '11:20' };
+    }
+
+    playAlertChime();
+    triggerVibrate();
+    showUrgentModal(phrase, lesson, bell, 5);
+
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        sendNativeNotification(phrase, 'Через 5 минут пара: ' + lesson.subject + ' (ауд. ' + lesson.room + ')');
+      } else if (Notification.permission === 'default') {
+        Notification.requestPermission().then(function (perm) {
+          if (perm === 'granted') {
+            sendNativeNotification(phrase, 'Через 5 минут пара: ' + lesson.subject + ' (ауд. ' + lesson.room + ')');
+          }
+        });
+      }
+    }
+  }
+
   // ── Обработчики событий ──────────────────────────────────────────
 
   els.changeGroup.addEventListener('click', openSetup);
@@ -1004,6 +1341,18 @@
   els.spinWheel.addEventListener('click', spinWheel);
   els.installBtn.addEventListener('click', openInstall);
 
+  if (els.reminderToggleBtn) {
+    els.reminderToggleBtn.addEventListener('click', toggleReminders);
+  }
+  if (els.reminderTestBtn) {
+    els.reminderTestBtn.addEventListener('click', triggerTestReminder);
+  }
+  if (els.reminderModal) {
+    els.reminderModal.addEventListener('click', function (event) {
+      if (event.target.closest('[data-reminder-close]')) closeReminderModal();
+    });
+  }
+
   els.installModal.addEventListener('click', function (event) {
     if (event.target.closest('[data-install-close]')) closeInstall();
   });
@@ -1012,6 +1361,7 @@
     if (event.key === 'Escape') {
       closeInstall();
       closeSetup();
+      closeReminderModal();
     }
   });
 
@@ -1074,6 +1424,9 @@
     if (state.view === 'schedule') renderScheduleTable();
     if (state.view === 'bells') renderBells();
   }, 60000);
+
+  // Каждые 10 секунд проверяем статус напоминалки за 5 минут
+  setInterval(updateReminderStatus, 10000);
 
   render();
   syncInstallButton();
