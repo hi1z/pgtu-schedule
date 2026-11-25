@@ -571,6 +571,11 @@ h1, h2, h3, h4, p, ul, ol {
   transition: all 0.15s ease;
 }
 
+.day-chip.is-today:not(.is-active) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
 .day-chip.is-active {
   background: #ffffff;
   color: #000000;

@@ -14,7 +14,7 @@
     week: 'even',
     weekAuto: true,
     view: 'schedule',
-    mobileDay: 'all', // 'all', 'mon', 'tue', 'wed', 'thu', 'fri'
+    mobileDay: null, // 'all', 'mon', 'tue', 'wed', 'thu', 'fri'
   };
 
   var STORAGE_KEY = 'pgtu.schedule.selection';
@@ -116,6 +116,10 @@
   function todayId() {
     var map = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
     return map[new Date().getDay()] || null;
+  }
+
+  function isMobileViewport() {
+    return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
   }
 
   function parseLocalDate(value) {
@@ -305,9 +309,11 @@
 
     // Mobile day filter active state
     if (els.mobileDayFilter) {
+      var today = todayId();
       Array.prototype.forEach.call(els.mobileDayFilter.querySelectorAll('[data-day]'), function (btn) {
         var active = btn.dataset.day === state.mobileDay;
         btn.classList.toggle('is-active', active);
+        btn.classList.toggle('is-today', btn.dataset.day === today);
       });
     }
   }
@@ -416,7 +422,7 @@
   function renderMobileDayStack() {
     if (!els.mobileDayStack) return;
 
-    if (!state.group || state.mobileDay === 'all') {
+    if (!state.group || !isMobileViewport() || state.mobileDay === 'all') {
       els.mobileDayStack.hidden = true;
       els.scheduleWrap.hidden = !state.group;
       return;
@@ -1425,7 +1431,15 @@
 
   readHash();
 
+  if (!state.mobileDay) {
+    state.mobileDay = isMobileViewport() ? (todayId() || 'mon') : 'all';
+  }
+
   if (!state.group) readStored();
+
+  window.addEventListener('resize', function () {
+    renderMobileDayStack();
+  });
 
   if (state.group) {
     saveSelection();
