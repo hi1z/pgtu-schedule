@@ -1,5 +1,5 @@
 /* Service Worker: офлайн-доступ и кэширование */
-var CACHE = 'pgtu-schedule-mono-v5';
+var CACHE = 'pgtu-schedule-mono-v6';
 
 var ASSETS = [
   './',

@@ -1806,6 +1806,270 @@ h1, h2, h3, h4, p, ul, ol {
   color: #ffffff;
 }
 
+/* ── Homework & Notes View ───────────────────────────────────── */
+
+.tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border-radius: var(--radius-full);
+}
+
+.tab.is-active .tab__badge {
+  background: #09090b;
+  color: #ffffff;
+}
+
+.hw-section-header {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.section-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.hw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 14px;
+}
+
+.hw-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  text-align: left;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: inherit;
+  font-family: inherit;
+  width: 100%;
+}
+
+.hw-card:hover {
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.hw-card.has-tasks {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.hw-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hw-card__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.hw-card__count {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.hw-card.has-tasks .hw-card__count {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+}
+
+.hw-card__meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.hw-card__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.hw-preview-item {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hw-preview-item::before {
+  content: "— ";
+  color: var(--text-dim);
+}
+
+.hw-modal-title {
+  margin-top: 6px;
+}
+
+.hw-form {
+  display: flex;
+  gap: 8px;
+}
+
+.hw-input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  color: #ffffff;
+  background: #09090b;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.hw-input:focus {
+  border-color: #ffffff;
+}
+
+.hw-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.hw-notes-empty {
+  text-align: center;
+  padding: 24px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.hw-note-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #09090b;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.hw-note-item.is-done {
+  opacity: 0.55;
+}
+
+.hw-note-check {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  accent-color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.hw-note-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.hw-note-text {
+  font-size: 13.5px;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.hw-note-item.is-done .hw-note-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.hw-note-date {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.hw-note-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.hw-note-delete:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Telegram Sync Modal ──────────────────────────────────────── */
+
+.tg-auth-btn.is-connected {
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.tg-desc {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.tg-status-box {
+  padding: 12px 14px;
+  background: #09090b;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.tg-status-box b {
+  color: #ffffff;
+}
+
+.tg-config-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ── Responsive Media Queries ─────────────────────────────────── */
 
 @media (max-width: 900px) {

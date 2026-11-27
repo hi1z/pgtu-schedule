@@ -32,6 +32,12 @@
       </div>
 
       <div class="header-actions">
+        <button class="btn btn--outline btn--sm tg-auth-btn" type="button" id="tg-auth-btn" title="Привязать Telegram-бота для синхронизации и уведомлений">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span id="tg-auth-text">Telegram</span>
+        </button>
         <button class="btn btn--outline btn--sm reminder-btn" type="button" id="reminder-toggle-btn" title="Напоминания о парах за 5 минут">
           <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -63,6 +69,15 @@
             <line x1="3" y1="10" x2="21" y2="10" stroke-linecap="round"/>
           </svg>
           <span>Занятия</span>
+        </button>
+
+        <button class="tab" type="button" data-view="homework">
+          <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 11l3 3L22 4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Задания</span>
+          <span class="tab__badge" id="hw-tab-badge" hidden>0</span>
         </button>
 
         <button class="tab" type="button" data-view="roulette">
@@ -148,7 +163,31 @@
       </section>
     </section>
 
-    <!-- VIEW 2: Рулетка -->
+    <!-- VIEW 2: Домашние задания -->
+    <section class="view" id="view-homework" aria-labelledby="homework-heading" hidden>
+      <div class="section-header hw-section-header">
+        <div>
+          <h2 class="section-title" id="homework-heading">Домашние задания</h2>
+          <p class="section-subtitle" id="hw-group-subtitle">Нажмите на предмет, чтобы добавить заметку</p>
+        </div>
+        <div class="segmented" id="hw-filter" role="group" aria-label="Фильтр заданий">
+          <button class="segmented__btn is-active" type="button" data-hw-filter="all">Все</button>
+          <button class="segmented__btn" type="button" data-hw-filter="active">С задачами</button>
+        </div>
+      </div>
+
+      <div class="schedule-empty" id="hw-empty-group" hidden>
+        <div class="empty-box">
+          <h3 class="empty-title">Группа не выбрана</h3>
+          <p class="empty-text">Выберите группу, чтобы увидеть список ваших предметов.</p>
+          <button class="btn btn--solid" type="button" id="hw-choose-group">Выбрать группу</button>
+        </div>
+      </div>
+
+      <div class="hw-grid" id="hw-subjects-grid"></div>
+    </section>
+
+    <!-- VIEW 3: Рулетка -->
     <section class="view" id="view-roulette" aria-labelledby="roulette-heading" hidden>
       <div class="section-header">
         <h2 class="section-title" id="roulette-heading">Рулетка выбора</h2>
@@ -296,6 +335,62 @@
       <div class="modal__footer urgent-footer">
         <button class="btn btn--solid btn--lg" type="button" data-reminder-close>Понял, бегу!</button>
         <button class="btn btn--outline" type="button" id="reminder-snooze" data-reminder-close>Ещё 1 минутка</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Заметки по предмету -->
+  <div class="modal" id="hw-modal" hidden>
+    <div class="modal__backdrop" data-hw-close></div>
+    <div class="modal__card modal__card--wide" role="dialog" aria-modal="true" aria-labelledby="hw-modal-title">
+      <div class="modal__header">
+        <div>
+          <span class="mono-badge" id="hw-modal-meta">ПРЕДМЕТ</span>
+          <h2 class="modal__title hw-modal-title" id="hw-modal-title">Название предмета</h2>
+        </div>
+        <button class="modal__close" type="button" aria-label="Закрыть" data-hw-close>×</button>
+      </div>
+
+      <div class="modal__body">
+        <form class="hw-form" id="hw-add-form">
+          <input class="hw-input" type="text" id="hw-input" placeholder="Что нужно сделать? (например: лаба №3 к пятнице)" autocomplete="off" required>
+          <button class="btn btn--solid" type="submit">Добавить</button>
+        </form>
+
+        <div class="hw-notes-list" id="hw-notes-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Привязка Telegram -->
+  <div class="modal" id="tg-modal" hidden>
+    <div class="modal__backdrop" data-tg-close></div>
+    <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="tg-modal-title">
+      <div class="modal__header">
+        <div>
+          <span class="mono-badge">TELEGRAM SYNC</span>
+          <h2 class="modal__title hw-modal-title" id="tg-modal-title">Синхронизация с ботом</h2>
+        </div>
+        <button class="modal__close" type="button" aria-label="Закрыть" data-tg-close>×</button>
+      </div>
+
+      <div class="modal__body" id="tg-modal-body">
+        <p class="tg-desc">
+          Подключите Telegram-бота, чтобы получать напоминания за 5 минут до пары прямо в мессенджер, смотреть расписание и синхронизировать заметки между телефоном и ПК.
+        </p>
+        <div class="tg-status-box" id="tg-status-box"></div>
+        <div class="tg-config-row">
+          <label class="setup__label" for="tg-api-input">Адрес сервера синхронизации (API URL)</label>
+          <div class="hw-form">
+            <input class="hw-input" type="url" id="tg-api-input" placeholder="https://your-bot.onrender.com">
+            <button class="btn btn--outline" type="button" id="tg-save-api">Сохранить</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal__footer">
+        <button class="btn btn--solid" type="button" id="tg-login-action">Войти через Telegram</button>
+        <button class="btn btn--outline" type="button" id="tg-logout-action" hidden>Отвязать аккаунт</button>
       </div>
     </div>
   </div>

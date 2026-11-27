@@ -1,0 +1,12 @@
+{
+  "name": "pgtu-schedule-bot",
+  "version": "1.0.0",
+  "description": "Telegram-бот и сервер синхронизации заметок для расписания ПГТУ (УНИИТ)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

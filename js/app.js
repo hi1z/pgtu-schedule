@@ -64,6 +64,26 @@
     reminderPhrase: document.getElementById('reminder-phrase'),
     reminderLessonDetails: document.getElementById('reminder-lesson-details'),
     reminderSnooze: document.getElementById('reminder-snooze'),
+    hwTabBadge: document.getElementById('hw-tab-badge'),
+    hwGroupSubtitle: document.getElementById('hw-group-subtitle'),
+    hwFilter: document.getElementById('hw-filter'),
+    hwEmptyGroup: document.getElementById('hw-empty-group'),
+    hwChooseGroup: document.getElementById('hw-choose-group'),
+    hwSubjectsGrid: document.getElementById('hw-subjects-grid'),
+    hwModal: document.getElementById('hw-modal'),
+    hwModalMeta: document.getElementById('hw-modal-meta'),
+    hwModalTitle: document.getElementById('hw-modal-title'),
+    hwAddForm: document.getElementById('hw-add-form'),
+    hwInput: document.getElementById('hw-input'),
+    hwNotesList: document.getElementById('hw-notes-list'),
+    tgAuthBtn: document.getElementById('tg-auth-btn'),
+    tgAuthText: document.getElementById('tg-auth-text'),
+    tgModal: document.getElementById('tg-modal'),
+    tgStatusBox: document.getElementById('tg-status-box'),
+    tgApiInput: document.getElementById('tg-api-input'),
+    tgSaveApi: document.getElementById('tg-save-api'),
+    tgLoginAction: document.getElementById('tg-login-action'),
+    tgLogoutAction: document.getElementById('tg-logout-action'),
   };
 
   // ── Утилиты ──────────────────────────────────────────────────────
@@ -210,7 +230,7 @@
       state.weekAuto = false;
     }
 
-    if (view === 'schedule' || view === 'roulette') {
+    if (view === 'schedule' || view === 'homework' || view === 'roulette') {
       state.view = view;
     } else if (view === 'bells') {
       state.view = 'schedule';
@@ -535,8 +555,10 @@
     syncControls();
     renderSchedule();
     renderBells();
+    renderHomework();
     syncReminderButton();
     updateReminderStatus();
+    syncTelegramUI();
   }
 
   // ── Часы (Swiss Minimalist) ──────────────────────────────────────
@@ -1259,6 +1281,374 @@
     }
   }
 
+  // ── Домашние задания и заметки ──────────────────────────────────
+
+  var HW_STORAGE_KEY = 'pgtu.homework.notes';
+  var TG_API_STORAGE_KEY = 'pgtu.tg.apiUrl';
+  var TG_SESSION_STORAGE_KEY = 'pgtu.tg.session';
+
+  var hwState = {
+    filter: 'all', // 'all' | 'active'
+    activeSubject: null,
+    notes: {}, // { [subject]: [{ id, text, done, createdAt }] }
+  };
+
+  var tgState = {
+    apiUrl: '',
+    session: null, // { token, telegramId, username, firstName }
+    pollTimer: null,
+  };
+
+  function loadHomeworkNotes() {
+    try {
+      var raw = window.localStorage.getItem(HW_STORAGE_KEY);
+      hwState.notes = raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      hwState.notes = {};
+    }
+  }
+
+  function saveHomeworkNotes() {
+    try {
+      window.localStorage.setItem(HW_STORAGE_KEY, JSON.stringify(hwState.notes));
+    } catch (e) {}
+    pushNotesToCloud();
+  }
+
+  function loadTelegramState() {
+    try {
+      var urlParams = new URLSearchParams(window.location.search);
+      var apiFromUrl = urlParams.get('api');
+      if (apiFromUrl) {
+        window.localStorage.setItem(TG_API_STORAGE_KEY, apiFromUrl.replace(/\/+$/, ''));
+      }
+      tgState.apiUrl = window.localStorage.getItem(TG_API_STORAGE_KEY) || '';
+      var rawSess = window.localStorage.getItem(TG_SESSION_STORAGE_KEY);
+      tgState.session = rawSess ? JSON.parse(rawSess) : null;
+    } catch (e) {
+      tgState.session = null;
+    }
+  }
+
+  function getSubjectsForGroup(groupId) {
+    if (!DATA || !DATA.lessons || !groupId) return [];
+    var map = {};
+    DATA.lessons.forEach(function (lesson) {
+      if (lesson.groups.indexOf(groupId) === -1) return;
+      if (!map[lesson.subject]) {
+        map[lesson.subject] = {
+          subject: lesson.subject,
+          types: [],
+          teachers: [],
+        };
+      }
+      var entry = map[lesson.subject];
+      if (lesson.typeLabel && entry.types.indexOf(lesson.typeLabel) === -1) {
+        entry.types.push(lesson.typeLabel);
+      }
+      if (lesson.teacher && entry.teachers.indexOf(lesson.teacher) === -1) {
+        entry.teachers.push(lesson.teacher);
+      }
+    });
+
+    return Object.keys(map).sort(function (a, b) {
+      return a.localeCompare(b, 'ru');
+    }).map(function (key) { return map[key]; });
+  }
+
+  function getSubjectNotes(subject) {
+    return Array.isArray(hwState.notes[subject]) ? hwState.notes[subject] : [];
+  }
+
+  function countActiveNotesTotal(subjects) {
+    var total = 0;
+    subjects.forEach(function (item) {
+      var list = getSubjectNotes(item.subject);
+      list.forEach(function (n) {
+        if (!n.done) total++;
+      });
+    });
+    return total;
+  }
+
+  function formatShortDate(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    return pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  function renderHomework() {
+    if (!els.hwSubjectsGrid) return;
+
+    var hasGroup = !!state.group;
+    if (els.hwEmptyGroup) els.hwEmptyGroup.hidden = hasGroup;
+    els.hwSubjectsGrid.hidden = !hasGroup;
+
+    if (!hasGroup) {
+      if (els.hwTabBadge) els.hwTabBadge.hidden = true;
+      return;
+    }
+
+    var group = groupById(state.group);
+    if (els.hwGroupSubtitle) {
+      els.hwGroupSubtitle.textContent = (group ? group.name : state.group) + ' · Нажмите на предмет, чтобы добавить заметку';
+    }
+
+    var subjects = getSubjectsForGroup(state.group);
+    var totalActive = countActiveNotesTotal(subjects);
+
+    if (els.hwTabBadge) {
+      els.hwTabBadge.textContent = String(totalActive);
+      els.hwTabBadge.hidden = totalActive === 0;
+    }
+
+    if (els.hwFilter) {
+      Array.prototype.forEach.call(els.hwFilter.querySelectorAll('[data-hw-filter]'), function (btn) {
+        btn.classList.toggle('is-active', btn.dataset.hwFilter === hwState.filter);
+      });
+    }
+
+    var visibleSubjects = subjects.filter(function (item) {
+      if (hwState.filter !== 'active') return true;
+      return getSubjectNotes(item.subject).some(function (n) { return !n.done; });
+    });
+
+    if (!visibleSubjects.length) {
+      els.hwSubjectsGrid.innerHTML =
+        '<div class="hw-notes-empty" style="grid-column: 1 / -1;">' +
+          (hwState.filter === 'active'
+            ? 'Нет активных заданий. Переключитесь на «Все», чтобы добавить новую заметку.'
+            : 'Для этой группы предметы не найдены.') +
+        '</div>';
+      return;
+    }
+
+    els.hwSubjectsGrid.innerHTML = visibleSubjects.map(function (item) {
+      var notes = getSubjectNotes(item.subject);
+      var activeNotes = notes.filter(function (n) { return !n.done; });
+      var metaParts = [];
+      if (item.types.length) metaParts.push(item.types.join(', '));
+      if (item.teachers.length) metaParts.push(item.teachers.join(', '));
+
+      var previewHtml = '';
+      if (activeNotes.length) {
+        previewHtml = '<div class="hw-card__preview">' +
+          activeNotes.slice(0, 2).map(function (n) {
+            return '<div class="hw-preview-item">' + escapeHtml(n.text) + '</div>';
+          }).join('') +
+          (activeNotes.length > 2 ? '<div class="hw-preview-item" style="color:var(--text-dim);">и ещё ' + (activeNotes.length - 2) + '…</div>' : '') +
+        '</div>';
+      }
+
+      var countLabel = activeNotes.length
+        ? activeNotes.length + ' ' + (activeNotes.length === 1 ? 'задача' : activeNotes.length < 5 ? 'задачи' : 'задач')
+        : (notes.length ? 'Всё сделано' : 'Нет задач');
+
+      return '<button type="button" class="hw-card' + (activeNotes.length ? ' has-tasks' : '') + '" data-hw-subject="' + escapeHtml(item.subject) + '">' +
+        '<div class="hw-card__header">' +
+          '<h3 class="hw-card__title">' + escapeHtml(item.subject) + '</h3>' +
+          '<span class="hw-card__count">' + escapeHtml(countLabel) + '</span>' +
+        '</div>' +
+        (metaParts.length ? '<div class="hw-card__meta">' + escapeHtml(metaParts.join(' · ')) + '</div>' : '') +
+        previewHtml +
+      '</button>';
+    }).join('');
+  }
+
+  function renderHwModalNotes() {
+    if (!els.hwNotesList || !hwState.activeSubject) return;
+    var notes = getSubjectNotes(hwState.activeSubject);
+
+    if (!notes.length) {
+      els.hwNotesList.innerHTML = '<div class="hw-notes-empty">Заметок пока нет. Добавьте первое задание выше!</div>';
+      return;
+    }
+
+    els.hwNotesList.innerHTML = notes.map(function (note) {
+      return '<div class="hw-note-item' + (note.done ? ' is-done' : '') + '" data-note-id="' + escapeHtml(note.id) + '">' +
+        '<input type="checkbox" class="hw-note-check" aria-label="Отметить выполненным"' + (note.done ? ' checked' : '') + '>' +
+        '<div class="hw-note-body">' +
+          '<div class="hw-note-text">' + escapeHtml(note.text) + '</div>' +
+          '<span class="hw-note-date">' + escapeHtml(formatShortDate(note.createdAt)) + '</span>' +
+        '</div>' +
+        '<button type="button" class="hw-note-delete" aria-label="Удалить заметку" title="Удалить">×</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function openHwModal(subject) {
+    if (!els.hwModal) return;
+    hwState.activeSubject = subject;
+    if (els.hwModalTitle) els.hwModalTitle.textContent = subject;
+    if (els.hwModalMeta) {
+      var group = groupById(state.group);
+      els.hwModalMeta.textContent = (group ? group.name : 'ПРЕДМЕТ') + ' · ЗАМЕТКИ';
+    }
+    renderHwModalNotes();
+    els.hwModal.hidden = false;
+    document.body.classList.add('has-modal');
+    if (els.hwInput) els.hwInput.focus();
+  }
+
+  function closeHwModal() {
+    if (!els.hwModal || els.hwModal.hidden) return;
+    els.hwModal.hidden = true;
+    hwState.activeSubject = null;
+    document.body.classList.remove('has-modal');
+  }
+
+  // ── Telegram Sync API ───────────────────────────────────────────
+
+  function syncTelegramUI() {
+    if (els.tgAuthBtn && els.tgAuthText) {
+      var connected = !!(tgState.session && tgState.session.token);
+      els.tgAuthBtn.classList.toggle('is-connected', connected);
+      els.tgAuthText.textContent = connected
+        ? ('@' + (tgState.session.username || tgState.session.firstName || 'Telegram'))
+        : 'Telegram';
+    }
+
+    if (els.tgApiInput && document.activeElement !== els.tgApiInput) {
+      els.tgApiInput.value = tgState.apiUrl || '';
+    }
+
+    if (els.tgStatusBox) {
+      if (tgState.session && tgState.session.token) {
+        els.tgStatusBox.innerHTML =
+          'Статус: <b>Подключено</b> (' +
+          escapeHtml(tgState.session.firstName || '') +
+          (tgState.session.username ? ' · @' + escapeHtml(tgState.session.username) : '') +
+          ')<br>Заметки и напоминания синхронизируются с ботом.';
+      } else if (tgState.apiUrl) {
+        els.tgStatusBox.innerHTML = 'Сервер настроен: <b>' + escapeHtml(tgState.apiUrl) + '</b><br>Нажмите «Войти через Telegram» для привязки аккаунта.';
+      } else {
+        els.tgStatusBox.innerHTML = 'Сервер бота ещё не привязан. Запустите сервер из папки <code>bot/</code> и вставьте его URL ниже, чтобы включить облачную синхронизацию и пуши в Telegram.';
+      }
+    }
+
+    if (els.tgLoginAction) els.tgLoginAction.hidden = !!(tgState.session && tgState.session.token);
+    if (els.tgLogoutAction) els.tgLogoutAction.hidden = !(tgState.session && tgState.session.token);
+  }
+
+  function openTgModal() {
+    if (!els.tgModal) return;
+    syncTelegramUI();
+    els.tgModal.hidden = false;
+    document.body.classList.add('has-modal');
+  }
+
+  function closeTgModal() {
+    if (!els.tgModal || els.tgModal.hidden) return;
+    els.tgModal.hidden = true;
+    document.body.classList.remove('has-modal');
+    if (tgState.pollTimer) {
+      clearInterval(tgState.pollTimer);
+      tgState.pollTimer = null;
+    }
+  }
+
+  function fetchCloudNotes() {
+    if (!tgState.apiUrl || !tgState.session || !tgState.session.token) return;
+    fetch(tgState.apiUrl + '/api/notes', {
+      headers: { 'Authorization': 'Bearer ' + tgState.session.token },
+    }).then(function (res) {
+      return res.ok ? res.json() : null;
+    }).then(function (data) {
+      if (!data || !data.notes) return;
+      hwState.notes = data.notes;
+      try {
+        window.localStorage.setItem(HW_STORAGE_KEY, JSON.stringify(hwState.notes));
+      } catch (e) {}
+      if (data.group && data.group !== state.group) {
+        applyGroup(data.group);
+        saveSelection();
+      }
+      renderHomework();
+      renderHwModalNotes();
+    }).catch(function () {});
+  }
+
+  function pushNotesToCloud() {
+    if (!tgState.apiUrl || !tgState.session || !tgState.session.token) return;
+    fetch(tgState.apiUrl + '/api/notes', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + tgState.session.token,
+      },
+      body: JSON.stringify({
+        group: state.group,
+        notes: hwState.notes,
+      }),
+    }).catch(function () {});
+  }
+
+  function startTelegramLogin() {
+    if (!tgState.apiUrl) {
+      if (els.tgStatusBox) {
+        els.tgStatusBox.innerHTML = '<b>Сначала укажите URL сервера бота</b> в поле выше и нажмите «Сохранить».';
+      }
+      if (els.tgApiInput) els.tgApiInput.focus();
+      return;
+    }
+
+    if (els.tgLoginAction) {
+      els.tgLoginAction.disabled = true;
+      els.tgLoginAction.textContent = 'Генерируем ссылку…';
+    }
+
+    fetch(tgState.apiUrl + '/api/auth/init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group: state.group, notes: hwState.notes }),
+    }).then(function (res) {
+      if (!res.ok) throw new Error('Auth init failed');
+      return res.json();
+    }).then(function (data) {
+      if (!data.botUrl || !data.code) throw new Error('Invalid response');
+      window.open(data.botUrl, '_blank', 'noopener');
+      if (els.tgStatusBox) {
+        els.tgStatusBox.innerHTML = 'Откройте открывшуюся ссылку в Telegram и нажмите <b>Start</b>. Ожидаем подтверждения…';
+      }
+
+      if (tgState.pollTimer) clearInterval(tgState.pollTimer);
+      tgState.pollTimer = setInterval(function () {
+        fetch(tgState.apiUrl + '/api/auth/status?code=' + encodeURIComponent(data.code))
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (st) {
+            if (st && st.authenticated && st.session) {
+              clearInterval(tgState.pollTimer);
+              tgState.pollTimer = null;
+              tgState.session = st.session;
+              try {
+                window.localStorage.setItem(TG_SESSION_STORAGE_KEY, JSON.stringify(st.session));
+              } catch (e) {}
+              if (st.notes) {
+                hwState.notes = st.notes;
+                try {
+                  window.localStorage.setItem(HW_STORAGE_KEY, JSON.stringify(hwState.notes));
+                } catch (e) {}
+              }
+              syncTelegramUI();
+              renderHomework();
+              if (els.tgLoginAction) {
+                els.tgLoginAction.disabled = false;
+                els.tgLoginAction.textContent = 'Войти через Telegram';
+              }
+            }
+          }).catch(function () {});
+      }, 2000);
+    }).catch(function () {
+      if (els.tgStatusBox) {
+        els.tgStatusBox.innerHTML = 'Не удалось подключиться к серверу <b>' + escapeHtml(tgState.apiUrl) + '</b>. Проверьте адрес и работу бота.';
+      }
+      if (els.tgLoginAction) {
+        els.tgLoginAction.disabled = false;
+        els.tgLoginAction.textContent = 'Войти через Telegram';
+      }
+    });
+  }
+
   // ── Обработчики событий ──────────────────────────────────────────
 
   els.changeGroup.addEventListener('click', openSetup);
@@ -1387,8 +1777,123 @@
       closeInstall();
       closeSetup();
       closeReminderModal();
+      closeHwModal();
+      closeTgModal();
     }
   });
+
+  if (els.hwChooseGroup) {
+    els.hwChooseGroup.addEventListener('click', openSetup);
+  }
+
+  if (els.hwFilter) {
+    els.hwFilter.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-hw-filter]');
+      if (!btn) return;
+      hwState.filter = btn.dataset.hwFilter;
+      renderHomework();
+    });
+  }
+
+  if (els.hwSubjectsGrid) {
+    els.hwSubjectsGrid.addEventListener('click', function (event) {
+      var card = event.target.closest('[data-hw-subject]');
+      if (!card) return;
+      openHwModal(card.dataset.hwSubject);
+    });
+  }
+
+  if (els.hwModal) {
+    els.hwModal.addEventListener('click', function (event) {
+      if (event.target.closest('[data-hw-close]')) {
+        closeHwModal();
+      }
+    });
+  }
+
+  if (els.hwAddForm) {
+    els.hwAddForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (!hwState.activeSubject || !els.hwInput) return;
+      var text = els.hwInput.value.trim();
+      if (!text) return;
+
+      if (!Array.isArray(hwState.notes[hwState.activeSubject])) {
+        hwState.notes[hwState.activeSubject] = [];
+      }
+      hwState.notes[hwState.activeSubject].unshift({
+        id: String(Date.now()) + '-' + Math.random().toString(36).slice(2, 6),
+        text: text,
+        done: false,
+        createdAt: Date.now(),
+      });
+      els.hwInput.value = '';
+      saveHomeworkNotes();
+      renderHwModalNotes();
+      renderHomework();
+    });
+  }
+
+  if (els.hwNotesList) {
+    els.hwNotesList.addEventListener('click', function (event) {
+      var itemEl = event.target.closest('[data-note-id]');
+      if (!itemEl || !hwState.activeSubject) return;
+      var noteId = itemEl.dataset.noteId;
+      var list = getSubjectNotes(hwState.activeSubject);
+
+      if (event.target.closest('.hw-note-delete')) {
+        hwState.notes[hwState.activeSubject] = list.filter(function (n) { return n.id !== noteId; });
+        saveHomeworkNotes();
+        renderHwModalNotes();
+        renderHomework();
+        return;
+      }
+
+      if (event.target.classList.contains('hw-note-check')) {
+        list.forEach(function (n) {
+          if (n.id === noteId) n.done = !n.done;
+        });
+        saveHomeworkNotes();
+        renderHwModalNotes();
+        renderHomework();
+      }
+    });
+  }
+
+  if (els.tgAuthBtn) {
+    els.tgAuthBtn.addEventListener('click', openTgModal);
+  }
+
+  if (els.tgModal) {
+    els.tgModal.addEventListener('click', function (event) {
+      if (event.target.closest('[data-tg-close]')) closeTgModal();
+    });
+  }
+
+  if (els.tgSaveApi) {
+    els.tgSaveApi.addEventListener('click', function () {
+      if (!els.tgApiInput) return;
+      tgState.apiUrl = els.tgApiInput.value.trim().replace(/\/+$/, '');
+      try {
+        window.localStorage.setItem(TG_API_STORAGE_KEY, tgState.apiUrl);
+      } catch (e) {}
+      syncTelegramUI();
+    });
+  }
+
+  if (els.tgLoginAction) {
+    els.tgLoginAction.addEventListener('click', startTelegramLogin);
+  }
+
+  if (els.tgLogoutAction) {
+    els.tgLogoutAction.addEventListener('click', function () {
+      tgState.session = null;
+      try {
+        window.localStorage.removeItem(TG_SESSION_STORAGE_KEY);
+      } catch (e) {}
+      syncTelegramUI();
+    });
+  }
 
   window.addEventListener('beforeinstallprompt', function (event) {
     event.preventDefault();
@@ -1429,6 +1934,8 @@
 
   // ── Инициализация ────────────────────────────────────────────────
 
+  loadHomeworkNotes();
+  loadTelegramState();
   readHash();
 
   if (!state.mobileDay) {
@@ -1462,6 +1969,7 @@
   setInterval(updateReminderStatus, 10000);
 
   render();
+  fetchCloudNotes();
   syncInstallButton();
 
   if (!state.group) openSetup();
