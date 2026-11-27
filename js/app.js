@@ -1286,6 +1286,7 @@
   var HW_STORAGE_KEY = 'pgtu.homework.notes';
   var TG_API_STORAGE_KEY = 'pgtu.tg.apiUrl';
   var TG_SESSION_STORAGE_KEY = 'pgtu.tg.session';
+  var DEFAULT_TG_API_URL = 'https://pgtu-schedule-bot.onrender.com';
 
   var hwState = {
     filter: 'all', // 'all' | 'active'
@@ -1294,7 +1295,7 @@
   };
 
   var tgState = {
-    apiUrl: '',
+    apiUrl: DEFAULT_TG_API_URL,
     session: null, // { token, telegramId, username, firstName }
     pollTimer: null,
   };
@@ -1322,7 +1323,7 @@
       if (apiFromUrl) {
         window.localStorage.setItem(TG_API_STORAGE_KEY, apiFromUrl.replace(/\/+$/, ''));
       }
-      tgState.apiUrl = window.localStorage.getItem(TG_API_STORAGE_KEY) || '';
+      tgState.apiUrl = window.localStorage.getItem(TG_API_STORAGE_KEY) || DEFAULT_TG_API_URL;
       var rawSess = window.localStorage.getItem(TG_SESSION_STORAGE_KEY);
       tgState.session = rawSess ? JSON.parse(rawSess) : null;
     } catch (e) {
